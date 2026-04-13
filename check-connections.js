@@ -48,6 +48,26 @@ async function checkProvider(provider) {
   }
 }
 
+function formatResults(results) {
+  const nameWidth = 14;
+
+  console.log('\n' + '─'.repeat(42));
+  console.log('Provider'.padEnd(nameWidth) + 'Status'.padEnd(10) + 'Latency');
+  console.log('─'.repeat(42));
+
+  for (const r of results) {
+    const icon = r.status === 'OK' ? '✅' : '❌';
+    const status = `${icon} ${r.status}`;
+    const latency = r.status === 'OK' ? `${r.latency} ms` : r.error;
+    console.log(r.provider.padEnd(nameWidth) + status.padEnd(12) + latency);
+  }
+
+  console.log('─'.repeat(42));
+
+  const ok = results.filter(r => r.status === 'OK').length;
+  console.log(`\n${ok}/${results.length} providers OK\n`);
+}
+
 const providers = [
   {
     name: 'Mistral',
@@ -60,16 +80,20 @@ const providers = [
     name: 'Groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
     key: process.env.GROQ_API_KEY,
-    model: 'llama-3.1-8b-instant',
+    model: 'llama-3.3-70b-versatile',
     format: 'openai',
   },
   {
     name: 'HuggingFace',
     url: 'https://router.huggingface.co/featherless-ai/v1/chat/completions',
     key: process.env.HF_API_KEY,
-    model: 'meta-llama/Meta-Llama-3.1-8B-Instruct',
+    model: 'meta-llama/Llama-3.1-8B-Instruct',
     format: 'openai',
   },
 ];
 
-Promise.all(providers.map(checkProvider)).then(results => results.forEach(r => console.log(r)));
+if (require.main === module) {
+  Promise.all(providers.map(checkProvider)).then(formatResults);
+}
+
+module.exports = { checkProvider, formatResults };
