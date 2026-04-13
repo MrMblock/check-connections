@@ -10,37 +10,66 @@ for (const [name, value] of Object.entries(keys)) {
   console.log(`${name}: ${value ? 'présente' : 'MANQUANTE'}`);
 }
 
-async function checkMistral() {
-  const key = process.env.MISTRAL_API_KEY;
-  if (!key) {
-    return { provider: 'Mistral', status: 'ERROR', latency: 0, error: 'Clé API manquante' };
+async function checkProvider(provider) {
+  if (!provider.key) {
+    return { provider: provider.name, status: 'ERROR', latency: 0, error: 'Clé API manquante' };
   }
 
   const start = Date.now();
+
+  const body =
+    provider.format === 'huggingface'
+      ? JSON.stringify({ inputs: 'Hi', parameters: { max_new_tokens: 5 } })
+      : JSON.stringify({
+          model: provider.model,
+          messages: [{ role: 'user', content: 'Hi' }],
+          max_tokens: 5,
+        });
+
   try {
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    const response = await fetch(provider.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${provider.key}`,
       },
-      body: JSON.stringify({
-        model: 'mistral-small-latest',
-        messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 5,
-      }),
+      body,
     });
 
     const latency = Date.now() - start;
 
     if (!response.ok) {
-      return { provider: 'Mistral', status: 'ERROR', latency, error: `HTTP ${response.status}` };
+      return { provider: provider.name, status: 'ERROR', latency, error: `HTTP ${response.status}` };
     }
 
-    return { provider: 'Mistral', status: 'OK', latency };
+    return { provider: provider.name, status: 'OK', latency };
   } catch (err) {
-    return { provider: 'Mistral', status: 'ERROR', latency: Date.now() - start, error: err.message };
+    return { provider: provider.name, status: 'ERROR', latency: Date.now() - start, error: err.message };
   }
 }
 
-checkMistral().then(console.log);
+const providers = [
+  {
+    name: 'Mistral',
+    url: 'https://api.mistral.ai/v1/chat/completions',
+    key: process.env.MISTRAL_API_KEY,
+    model: 'mistral-small-latest',
+    format: 'openai',
+  },
+  {
+    name: 'Groq',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    key: process.env.GROQ_API_KEY,
+    model: 'llama-3.1-8b-instant',
+    format: 'openai',
+  },
+  {
+    name: 'HuggingFace',
+    url: 'https://router.huggingface.co/featherless-ai/v1/chat/completions',
+    key: process.env.HF_API_KEY,
+    model: 'meta-llama/Meta-Llama-3.1-8B-Instruct',
+    format: 'openai',
+  },
+];
+
+Promise.all(providers.map(checkProvider)).then(results => results.forEach(r => console.log(r)));
